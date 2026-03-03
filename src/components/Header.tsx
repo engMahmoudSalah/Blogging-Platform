@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useBlog } from '../context/BlogContext';
 import { useTheme } from '../context/ThemeContext';
 
+// images
+import logo from '../Images/logo.jpeg';
+
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -44,8 +47,8 @@ export function Header() {
           <div className="flex justify-between items-center h-20 gap-4">
           <Link to="/" className="flex items-center gap-2 group shrink-0">
             <img 
-              src="https://drive.google.com/uc?export=view&id=1GR3WVRGjrPIfC8K9lGaCOPZSJA761djx" 
-              alt="MD.Blog Logo" 
+              src={logo}
+              alt="MD Logo" 
               className="h-9 w-auto hover:scale-105 transition-transform"
               referrerPolicy="no-referrer"
             />
