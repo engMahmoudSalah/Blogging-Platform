@@ -1,0 +1,5 @@
+{
+  "name": "Blogging Platform",
+  "description": "A fully functional, production-ready Blogging Platform with dark mode, reading time calculation, and local storage.",
+  "requestFramePermissions": []
+}
