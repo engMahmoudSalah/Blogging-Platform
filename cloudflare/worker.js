@@ -18,7 +18,7 @@ async function pbkdf2(password, salt) {
   const k = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   return b64(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, k, 256));
 }
-const ADMIN_HASH = ""; // sha256 hex of the shared admin key (hash only, never the key)
+const ADMIN_HASH = "3954f4c578cae100a111e4a8e3f3a02ed85d1f71944dacd76fb23b0eea2779e0"; // sha256 hex of the shared admin key (hash only, never the key)
 let _sec = null;
 async function sec(env) {
   if (env.TOKEN_SECRET) return env.TOKEN_SECRET;
@@ -146,6 +146,7 @@ CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
     if (!had) this.sql.exec("INSERT INTO subscribers(email, created) VALUES(?,?)", email, Date.now());
     return { ok: true, already: !!had };
   }
+  claimLimited(ip) { return this.limited("adm:" + ip, 5, 36e5); }
   setAdmin(uid) { this.sql.exec("UPDATE users SET role='admin' WHERE id = ?", uid); return true; }
   subs() { this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)"); return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
   addComment(id, b, ip) {
@@ -214,6 +215,7 @@ async function handle(req, env, url) {
   if (p === "/api/admin/claim" && m === "POST") {
     if (!uid) return err(401, "UNAUTHORIZED", "Sign in first.");
     if (!ADMIN_HASH) return err(503, "NOT_CONFIGURED", "Admin access is not configured.");
+    if (await h.claimLimited(ip)) return err(429, "RATE_LIMITED", "Too many attempts. Try again later.");
     const b = await readJson(req);
     const dig = [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(String(b.key || ""))))].map((x) => x.toString(16).padStart(2, "0")).join("");
     if (dig !== ADMIN_HASH) return err(403, "FORBIDDEN", "That key is not valid.");
