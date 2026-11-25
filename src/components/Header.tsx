@@ -4,6 +4,7 @@ import { Menu, X, Plus, Search, AlertCircle, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBlog } from '../context/BlogContext';
 import { useTheme } from '../context/ThemeContext';
+import { SyncPanel } from './SyncPanel';
 
 // images
 import logo from '../Images/logo.jpeg';
@@ -70,6 +71,7 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4 shrink-0">
+            <SyncPanel />
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -100,6 +102,7 @@ export function Header() {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center gap-4">
+            <SyncPanel />
             <button
               onClick={toggleTheme}
               className="p-2 text-slate-500 dark:text-slate-400"

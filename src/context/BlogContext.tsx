@@ -20,6 +20,7 @@ interface BlogContextType {
   getPost: (id: string) => Post | undefined;
   toggleLike: (id: string) => void;
   incrementViews: (id: string) => void;
+  replacePosts: (posts: Post[]) => void;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
@@ -127,7 +128,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       deletePost,
       getPost,
       toggleLike,
-      incrementViews
+      incrementViews,
+      replacePosts: setPosts
     }}>
       {children}
     </BlogContext.Provider>
