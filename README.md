@@ -1,4 +1,4 @@
-# Blogging Platform
+# Quill
 
 Blogging app with a post editor and end-to-end encrypted cloud sync.
 
