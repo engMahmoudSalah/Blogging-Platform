@@ -4,6 +4,7 @@ import { Post } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { calculateReadingTime } from '../utils/readingTime';
 import { seedPosts } from '../utils/seedData';
+import { api } from '../api';
 
 interface BlogContextType {
   posts: Post[];
@@ -21,22 +22,35 @@ interface BlogContextType {
   toggleLike: (id: string) => void;
   incrementViews: (id: string) => void;
   replacePosts: (posts: Post[]) => void;
+  reloadFeed: () => Promise<void>;
+  serverMode: boolean;
 }
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const [storageError, setStorageError] = useState(false);
-  const [posts, setPosts] = useLocalStorage<Post[]>('blog_posts', [], (err) => {
+  const [localPosts, setPosts] = useLocalStorage<Post[]>('blog_posts', [], (err) => {
     if (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
       setStorageError(true);
     }
   });
+  const [serverPosts, setServerPosts] = useState<Post[] | null>(null);
+  const reloadFeed = async () => {
+    try {
+      const r = await api<{ posts: Post[]; total: number }>('/public/posts?limit=50');
+      setServerPosts(r.posts);
+    } catch { /* offline: keep local demo posts */ }
+  };
+  useEffect(() => { reloadFeed(); }, []);
+  // Once the cloud has real posts, they replace the local demo posts.
+  const serverMode = serverPosts !== null && serverPosts.length > 0;
+  const posts = serverMode ? (serverPosts as Post[]) : localPosts;
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'popular'>('newest');
 
   useEffect(() => {
-    if (posts.length === 0) {
+    if (localPosts.length === 0) {
       setPosts(seedPosts);
     }
   }, []);
@@ -82,12 +96,22 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleLike = (id: string) => {
+    if (serverMode) {
+      setServerPosts(prev => (prev || []).map(post => post.id === id ? { ...post, likes: post.likes + 1 } : post));
+      api('/public/posts/' + id + '/like', { method: 'POST' }).catch(() => {});
+      return;
+    }
     setPosts(prev => prev.map(post => 
       post.id === id ? { ...post, likes: post.likes + 1 } : post
     ));
   };
 
   const incrementViews = (id: string) => {
+    if (serverMode) {
+      const k = 'viewed_' + id;
+      if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); api('/public/posts/' + id + '/view', { method: 'POST' }).catch(() => {}); }
+      return;
+    }
     setPosts(prev => prev.map(post => 
       post.id === id ? { ...post, views: (post.views || 0) + 1 } : post
     ));
@@ -129,7 +153,9 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       getPost,
       toggleLike,
       incrementViews,
-      replacePosts: setPosts
+      replacePosts: setPosts,
+      reloadFeed,
+      serverMode
     }}>
       {children}
     </BlogContext.Provider>

@@ -11,8 +11,10 @@ interface PostFormProps {
     tags: string[];
     coverImage?: string;
     featured?: boolean;
+    status?: 'draft' | 'published' | 'scheduled';
+    publishAt?: number | null;
   };
-  onSubmit: (title: string, content: string, tags: string[], coverImage?: string, featured?: boolean) => void;
+  onSubmit: (title: string, content: string, tags: string[], coverImage?: string, featured?: boolean, opts?: { status: string; publishAt?: number }) => void;
   isEditing?: boolean;
 }
 
@@ -22,6 +24,9 @@ export function PostForm({ initialData, onSubmit, isEditing = false }: PostFormP
   const [tags, setTags] = useState<string[]>(initialData?.tags || []);
   const [coverImage, setCoverImage] = useState(initialData?.coverImage || '');
   const [featured, setFeatured] = useState(initialData?.featured || false);
+  const [status, setStatus] = useState<'draft' | 'published' | 'scheduled'>(initialData?.status === 'scheduled' && (initialData.publishAt || 0) <= Date.now() ? 'published' : (initialData?.status || 'published'));
+  const toLocal = (t?: number | null) => { if (!t) return ''; const d = new Date(t - new Date(t).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  const [publishAt, setPublishAt] = useState(toLocal(initialData?.publishAt && initialData.publishAt > Date.now() ? initialData.publishAt : undefined));
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<{ title?: string; content?: string }>({});
   
@@ -56,7 +61,9 @@ export function PostForm({ initialData, onSubmit, isEditing = false }: PostFormP
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      onSubmit(title.trim(), content.trim(), tags, coverImage.trim() || undefined, featured);
+      const when = status === 'scheduled' ? new Date(publishAt).getTime() : undefined;
+      if (status === 'scheduled' && (!when || when <= Date.now())) { setErrors({ ...errors, title: 'Pick a future date and time to schedule.' }); return; }
+      onSubmit(title.trim(), content.trim(), tags, coverImage.trim() || undefined, featured, { status, publishAt: when });
     }
   };
 
@@ -112,7 +119,7 @@ export function PostForm({ initialData, onSubmit, isEditing = false }: PostFormP
             className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full font-bold transition-all active:scale-95 shadow-lg shadow-orange-500/25"
           >
             <Save size={18} />
-            {isEditing ? 'Update' : 'Publish'}
+            {status === 'draft' ? 'Save draft' : status === 'scheduled' ? 'Schedule' : isEditing ? 'Update' : 'Publish'}
           </button>
         </div>
       </div>
@@ -137,6 +144,18 @@ export function PostForm({ initialData, onSubmit, isEditing = false }: PostFormP
             } rounded-2xl text-slate-900 dark:text-white text-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all outline-none`}
           />
           {errors.title && <p className="mt-2 text-sm text-red-500 font-medium">{errors.title}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="status" className="block text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">Visibility</label>
+          <div className="flex flex-wrap gap-3 items-center">
+            <select id="status" value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'published' | 'scheduled')} className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+              <option value="published">Publish now</option>
+              <option value="draft">Save as draft (private)</option>
+              <option value="scheduled">Schedule for later</option>
+            </select>
+            {status === 'scheduled' && <input type="datetime-local" aria-label="Publish date and time" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white" />}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

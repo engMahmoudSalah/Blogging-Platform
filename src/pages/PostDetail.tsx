@@ -6,22 +6,65 @@ import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PostCard } from '../components/PostCard';
+import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
+import { sanitizeHtml } from '../utils/sanitize';
+import { Post } from '../types';
+
+function Comments({ id }: { id: string }) {
+  const [list, setList] = useState<{ id: number; name: string; body: string; created: number }[]>([]);
+  const [name, setName] = useState('');
+  const [body, setBody] = useState('');
+  const [website, setWebsite] = useState('');
+  const [note, setNote] = useState('');
+  useEffect(() => { api<{ comments: typeof list }>(`/public/posts/${id}/comments`).then((r) => setList(r.comments)).catch(() => {}); }, [id]);
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault(); setNote('');
+    try { await api(`/public/posts/${id}/comments`, { method: 'POST', body: { name, body, website } }); setBody(''); setNote('Thanks! Your comment will appear after the author approves it.'); }
+    catch (err: any) { setNote(err.message); }
+  };
+  const f = 'w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white';
+  return (
+    <section className="mt-16 pt-10 border-t border-slate-200 dark:border-slate-800" aria-labelledby="cm-h">
+      <h3 id="cm-h" className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Comments ({list.length})</h3>
+      <ul className="space-y-4 mb-8">{list.map((c) => (<li key={c.id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-4"><div className="text-sm font-bold text-slate-900 dark:text-white">{c.name} <span className="font-normal text-slate-500">· {format(new Date(c.created), 'MMM d, yyyy')}</span></div><p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap mt-1">{c.body}</p></li>))}</ul>
+      <form onSubmit={send} className="space-y-3">
+        <input className={f} placeholder="Your name" aria-label="Your name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
+        <textarea className={f} placeholder="Write a comment" aria-label="Comment" rows={3} value={body} onChange={(e) => setBody(e.target.value)} maxLength={1500} required />
+        <input tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        <button className="px-5 py-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white font-bold">Post comment</button>
+        {note && <p role="status" className="text-sm text-slate-700 dark:text-slate-300">{note}</p>}
+      </form>
+    </section>
+  );
+}
 
 export function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getPost, deletePost, incrementViews, posts } = useBlog();
+  const { getPost, deletePost, incrementViews, posts, serverMode, reloadFeed } = useBlog();
+  const { user } = useAuth();
+  const [fetched, setFetched] = useState<Post | null>(null);
+  const [tried, setTried] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const post = id ? getPost(id) : undefined;
+  const found = id ? getPost(id) : undefined;
+  useEffect(() => {
+    setFetched(null); setTried(false);
+    if (id && !found) api<{ post: Post }>('/public/posts/' + id).then((r) => setFetched(r.post)).catch(() => {}).finally(() => setTried(true));
+  }, [id]);
+  const post = found || fetched || undefined;
+  const isOwner = !!(user && post && post.author.handle === user.handle);
 
   useEffect(() => {
     if (post && id) {
-      incrementViews(id);
+      if (serverMode || fetched) incrementViews(id), (fetched && !serverMode && (() => { const k = 'viewed_' + id; if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); api('/public/posts/' + id + '/view', { method: 'POST' }).catch(() => {}); } })());
+      else incrementViews(id);
     }
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [id, !!post]);
 
+  if (!post && id && !tried && !found) return <div className="pt-40 text-center text-slate-500">Loading...</div>;
   if (!post) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -33,8 +76,8 @@ export function PostDetail() {
     );
   }
 
-  const handleDelete = () => {
-    deletePost(post.id);
+  const handleDelete = async () => {
+    if (isOwner) { await api('/posts/' + post.id, { method: 'DELETE' }); await reloadFeed(); } else deletePost(post.id);
     navigate('/');
   };
 
@@ -55,7 +98,7 @@ export function PostDetail() {
           <span>Back to Blog</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        {(isOwner || !serverMode) && <div className="flex items-center gap-2">
           <Link
             to={`/edit/${post.id}`}
             className="p-2 text-slate-400 hover:text-orange-500 transition-colors"
@@ -68,7 +111,7 @@ export function PostDetail() {
           >
             <Trash2 size={18} />
           </button>
-        </div>
+        </div>}
       </div>
 
       <header className="space-y-6 mb-10">
@@ -93,6 +136,7 @@ export function PostDetail() {
             <Clock size={14} />
             <span>{post.readingTime} min read</span>
           </div>
+          {post.author.handle && <span>by {post.author.name} (@{post.author.handle})</span>}
         </div>
       </header>
 
@@ -113,8 +157,10 @@ export function PostDetail() {
           prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed
           prose-blockquote:border-l-4 prose-blockquote:border-orange-500 prose-blockquote:bg-orange-50/50 dark:prose-blockquote:bg-orange-950/20 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-xl
           prose-img:rounded-3xl prose-img:border prose-img:border-slate-200 dark:prose-img:border-slate-800"
-        dangerouslySetInnerHTML={{ __html: post.content }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
       />
+
+      {(serverMode || fetched) && <Comments id={post.id} />}
 
       {/* Related Posts Section */}
       {relatedPosts.length > 0 && (
