@@ -18,6 +18,7 @@ async function pbkdf2(password, salt) {
   const k = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   return b64(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, k, 256));
 }
+const ADMIN_HASH = ""; // sha256 hex of the shared admin key (hash only, never the key)
 let _sec = null;
 async function sec(env) {
   if (env.TOKEN_SECRET) return env.TOKEN_SECRET;
@@ -145,6 +146,7 @@ CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
     if (!had) this.sql.exec("INSERT INTO subscribers(email, created) VALUES(?,?)", email, Date.now());
     return { ok: true, already: !!had };
   }
+  setAdmin(uid) { this.sql.exec("UPDATE users SET role='admin' WHERE id = ?", uid); return true; }
   subs() { this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)"); return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
   addComment(id, b, ip) {
     if (this.limited("cm:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many comments. Try again later."] };
@@ -207,15 +209,23 @@ async function handle(req, env, url) {
     return new Response(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${xml(r.user.name)} on Quill</title><link>${base}/@${r.user.handle}</link><description>${xml(r.user.bio || "Posts on Quill")}</description>${items}</channel></rss>`, { headers: { "content-type": "application/rss+xml; charset=utf-8" } });
   }
   if (p === "/api/public/subscribe" && m === "POST") { const r = await h.subscribe(await readJson(req), ip); return r.error ? err(...r.error) : json(r, 201); }
+  // authenticated
+  const uid = await readToken(env, req);
+  if (p === "/api/admin/claim" && m === "POST") {
+    if (!uid) return err(401, "UNAUTHORIZED", "Sign in first.");
+    if (!ADMIN_HASH) return err(503, "NOT_CONFIGURED", "Admin access is not configured.");
+    const b = await readJson(req);
+    const dig = [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(String(b.key || ""))))].map((x) => x.toString(16).padStart(2, "0")).join("");
+    if (dig !== ADMIN_HASH) return err(403, "FORBIDDEN", "That key is not valid.");
+    await h.setAdmin(uid); return json({ ok: true });
+  }
   if (p === "/api/admin/subscribers" && m === "GET") {
-    const k = req.headers.get("x-admin-key") || url.searchParams.get("key") || "";
-    if (!env.ADMIN_KEY || k !== env.ADMIN_KEY) return err(401, "UNAUTHORIZED", "Admin key required.");
+    const u = uid ? await h.me(uid) : null;
+    if (!u || u.role !== "admin") return err(403, "FORBIDDEN", "Admin only.");
     const rows = await h.subs();
     if (url.searchParams.get("format") === "csv") return new Response("email,subscribed_at\n" + rows.map((r) => r.email + "," + new Date(r.created).toISOString()).join("\n"), { headers: { "content-type": "text/csv" } });
     return json({ count: rows.length, subscribers: rows });
   }
-  // authenticated
-  const uid = await readToken(env, req);
   if (p === "/api/auth/me") { const u = uid ? await h.me(uid) : null; return u ? json({ user: u }) : err(401, "UNAUTHORIZED", "Not signed in."); }
   if (!uid || !(await h.me(uid))) return err(401, "UNAUTHORIZED", "Please sign in.");
   if (p === "/api/account" && m === "PATCH") return json({ user: await h.updateProfile(uid, await readJson(req)) });

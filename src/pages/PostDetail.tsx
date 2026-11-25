@@ -152,7 +152,7 @@ export function PostDetail() {
       )}
 
       <div 
-        className="prose prose-lg prose-slate dark:prose-invert max-w-none 
+        className="break-words [overflow-wrap:break-word] max-w-full overflow-x-hidden [&_p]:whitespace-normal prose prose-lg prose-slate dark:prose-invert max-w-none 
           prose-headings:text-slate-900 dark:prose-headings:text-white 
           prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-p:leading-relaxed
           prose-blockquote:border-l-4 prose-blockquote:border-orange-500 prose-blockquote:bg-orange-50/50 dark:prose-blockquote:bg-orange-950/20 prose-blockquote:py-1 prose-blockquote:px-6 prose-blockquote:rounded-r-xl

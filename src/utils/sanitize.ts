@@ -4,7 +4,7 @@ const ATTRS: Record<string, string[]> = { a: ['href', 'title'], img: ['src', 'al
 const safeUrl = (v: string, img: boolean) => /^https?:\/\//i.test(v) || (!img && /^mailto:/i.test(v)) || (img && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(v));
 
 export function sanitizeHtml(html: string): string {
-  const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');
+  const doc = new DOMParser().parseFromString('<body>' + html.replace(/&nbsp;|\u00a0/g, ' ') + '</body>', 'text/html');
   const walk = (node: Element) => {
     for (const child of Array.from(node.children)) {
       const tag = child.tagName.toLowerCase();

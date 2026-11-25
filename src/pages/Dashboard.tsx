@@ -15,7 +15,7 @@ export function Dashboard() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [comments, setComments] = useState<Cmt[]>([]);
-  const [tab, setTab] = useState<'posts' | 'comments' | 'profile'>('posts');
+  const [tab, setTab] = useState<'posts' | 'comments' | 'profile' | 'admin'>('posts');
   const [profile, setProfile] = useState({ name: '', bio: '', avatar: '' });
   const [msg, setMsg] = useState('');
 
@@ -30,6 +30,12 @@ export function Dashboard() {
 
   const del = async (id: string) => { if (!confirm('Delete this post and its comments?')) return; await api('/posts/' + id, { method: 'DELETE' }); await load(); reloadFeed(); refresh(); };
   const moderate = async (id: number, action: 'approve' | 'delete') => { await api(`/comments/${id}/${action}`, { method: 'POST' }); load(); };
+  const [adminKey, setAdminKey] = useState('');
+  const [subs, setSubs] = useState<{ email: string; created: number }[] | null>(null);
+  const [aMsg, setAMsg] = useState('');
+  const loadSubs = async () => { try { const r = await api<{ subscribers: { email: string; created: number }[] }>('/admin/subscribers'); setSubs(r.subscribers); setAMsg(''); } catch (e: any) { setSubs(null); setAMsg(e.message); } };
+  const claim = async () => { try { await api('/admin/claim', { method: 'POST', body: { key: adminKey } }); setAdminKey(''); await refresh(); await loadSubs(); } catch (e: any) { setAMsg(e.message); } };
+  useEffect(() => { if (tab === 'admin' && user?.role === 'admin') loadSubs(); }, [tab, user]);
   const saveProfile = async () => { await api('/account', { method: 'PATCH', body: profile }); await refresh(); setMsg('Saved'); setTimeout(() => setMsg(''), 2000); };
   const badge = (p: Post) => p.status === 'draft' ? ['Draft', 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'] : p.status === 'scheduled' && (p.publishAt || 0) > Date.now() ? ['Scheduled ' + format(new Date(p.publishAt as number), 'MMM d, HH:mm'), 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'] : ['Published', 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'];
   const card = 'rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5';
@@ -56,7 +62,7 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-6" role="group" aria-label="Dashboard sections">{tabBtn('posts', 'Posts')}{tabBtn('comments', `Comments${stats?.pending ? ' (' + stats.pending + ')' : ''}`)}{tabBtn('profile', 'Profile')}</div>
+      <div className="flex gap-2 mb-6" role="group" aria-label="Dashboard sections">{tabBtn('posts', 'Posts')}{tabBtn('comments', `Comments${stats?.pending ? ' (' + stats.pending + ')' : ''}`)}{tabBtn('admin', 'Admin')}{tabBtn('profile', 'Profile')}</div>
 
       {tab === 'posts' && (
         <div className="space-y-3">
@@ -88,6 +94,24 @@ export function Dashboard() {
                 <button onClick={() => moderate(c.id, 'delete')} className="text-sm font-bold text-red-600">Delete</button>
               </div>
             </div>))}
+        </div>
+      )}
+
+      {tab === 'admin' && (
+        <div className="max-w-xl space-y-4">
+          {user.role !== 'admin' ? (
+            <>
+              <p className="text-slate-700 dark:text-slate-300">Enter the admin key to see newsletter subscribers.</p>
+              <input type="password" aria-label="Admin key" value={adminKey} onChange={(e) => setAdminKey(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              <button onClick={claim} className="px-5 py-2 rounded-full bg-orange-600 text-white font-bold">Unlock</button>
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-slate-900 dark:text-white">{subs ? subs.length : 0} subscribers <a className="ml-3 text-sm text-orange-700 dark:text-orange-400 underline" href="/api/admin/subscribers?format=csv">Download CSV</a></p>
+              <ul className="divide-y divide-slate-200 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-800">{(subs || []).map((x) => <li key={x.email} className="flex justify-between gap-3 px-4 py-2 text-sm text-slate-800 dark:text-slate-200"><span className="break-all">{x.email}</span><span className="text-slate-500 shrink-0">{new Date(x.created).toLocaleDateString()}</span></li>)}</ul>
+            </>
+          )}
+          {aMsg && <p role="status" className="text-sm text-red-700 dark:text-red-400">{aMsg}</p>}
         </div>
       )}
 
