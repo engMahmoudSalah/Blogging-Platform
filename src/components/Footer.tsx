@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Github, User, Linkedin } from 'lucide-react';
 
 // images
-import { SiteDock } from './SiteDock';
 import logo from '../Images/logo.jpeg';
 
 export function Footer() {
@@ -24,19 +23,19 @@ export function Footer() {
           </p>
         </div>
         
-        <div className="flex items-center gap-6 text-slate-400 dark:text-slate-600">
-          <a href="https://mahmoud-salah-portfolio.netlify.app/" className="hover:text-orange-500 transition-colors" aria-label="Twitter">
+        <div className="flex items-center gap-5 text-slate-700 dark:text-slate-300">
+          <a href="https://md.mahmodsalah.workers.dev/" className="hover:text-orange-500 transition-colors" aria-label="Portfolio" title="Portfolio">
             <User size={20} />
           </a>
-          <a href="https://github.com/engMahmoudSalah" className="hover:text-orange-500 transition-colors" aria-label="GitHub">
+          <a href="https://github.com/engMahmoudSalah" className="hover:text-orange-500 transition-colors" aria-label="GitHub" title="GitHub">
             <Github size={20} />
           </a>
-          <a href="https://www.linkedin.com/in/mahmoud-salah-351309208" className="hover:text-orange-500 transition-colors" aria-label="LinkedIn">
+          <a href="https://www.linkedin.com/in/mahmod-salah" className="hover:text-orange-500 transition-colors" aria-label="LinkedIn" title="LinkedIn">
             <Linkedin size={20} />
           </a>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10"><SiteDock current="Quill" /></div>
+      
     </footer>
   );
 }
