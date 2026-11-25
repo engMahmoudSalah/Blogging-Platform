@@ -18,15 +18,21 @@ async function pbkdf2(password, salt) {
   const k = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   return b64(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, k, 256));
 }
+let _sec = null;
+async function sec(env) {
+  if (env.TOKEN_SECRET) return env.TOKEN_SECRET;
+  if (!_sec) _sec = await env.HUB.get(env.HUB.idFromName("main")).secret();
+  return _sec;
+}
 async function makeToken(env, uid) {
   const body = b64(enc.encode(JSON.stringify({ u: uid, e: Date.now() + 14 * 864e5 })));
-  return body + "." + (await hmac(env.TOKEN_SECRET, body));
+  return body + "." + (await hmac(await sec(env), body));
 }
 async function readToken(env, req) {
   const c = (req.headers.get("cookie") || "").match(/(?:^|;\s*)quill\.sid=([^;]+)/);
   const t = c ? decodeURIComponent(c[1]) : "";
   const [body, sig] = t.split(".");
-  if (!body || !sig || !env.TOKEN_SECRET || (await hmac(env.TOKEN_SECRET, body)) !== sig) return null;
+  if (!body || !sig || (await hmac(await sec(env), body)) !== sig) return null;
   try { const p = JSON.parse(new TextDecoder().decode(unb64(body))); return p.e > Date.now() ? p.u : null; } catch { return null; }
 }
 const cookie = (t, age) => `quill.sid=${encodeURIComponent(t)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`;
@@ -40,6 +46,12 @@ CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, 
 CREATE INDEX IF NOT EXISTS posts_user ON posts(user_id); CREATE INDEX IF NOT EXISTS posts_pub ON posts(status, publish_at);
 CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY AUTOINCREMENT, post_id TEXT NOT NULL, name TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
+  }
+  secret() {
+    this.sql.exec("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)");
+    const r = this.one("SELECT v FROM kv WHERE k='sec'"); if (r) return r.v;
+    const v = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    this.sql.exec("INSERT INTO kv VALUES('sec', ?)", v); return v;
   }
   one(q, ...a) { for (const r of this.sql.exec(q, ...a)) return r; return null; }
   all(q, ...a) { return [...this.sql.exec(q, ...a)]; }

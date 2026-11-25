@@ -49,7 +49,7 @@ export function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            className="text-base md:text-lg text-foreground/70 dark:text-white/70 leading-relaxed max-w-2xl mx-auto font-normal"
+            className="text-base md:text-lg text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto font-normal"
           >
             Explore the intersection of AI, automation, and modern agency building. 
             Insights for the next generation of digital entrepreneurs.

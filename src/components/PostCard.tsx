@@ -31,6 +31,8 @@ export function PostCard({ post, index }: PostCardProps) {
             alt={post.title} 
             className="w-full aspect-[4/3] object-cover transition-transform duration-700 group-hover:scale-105"
             referrerPolicy="no-referrer"
+            loading="lazy"
+            onError={(e) => { const t = e.currentTarget; if (!t.dataset.fb) { t.dataset.fb = '1'; t.src = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="800" height="600" fill="url(#g)"/></svg>'); } }}
           />
         ) : (
           <div className="w-full aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex items-center justify-center">

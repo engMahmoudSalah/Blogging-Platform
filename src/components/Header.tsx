@@ -51,7 +51,7 @@ export function Header() {
             <img 
               src={logo}
               alt="MD Logo" 
-              className="h-9 w-auto hover:scale-105 transition-transform"
+              className="h-9 w-auto hover:scale-105 transition-transform brightness-0 dark:brightness-100"
               referrerPolicy="no-referrer"
             />
           </Link>

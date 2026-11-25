@@ -1,0 +1,8 @@
+{
+  "name": "blogging-platform",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-06-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"], "binding": "ASSETS" },
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] }
+}
