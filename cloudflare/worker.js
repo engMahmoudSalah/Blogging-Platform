@@ -42,17 +42,22 @@ const readTime = (html) => Math.max(1, Math.ceil(String(html).replace(/<[^>]+>/g
 export class Hub extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env); this.sql = ctx.storage.sql; this.rl = new Map();
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, handle TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, bio TEXT DEFAULT '', avatar TEXT DEFAULT '', salt TEXT NOT NULL, hash TEXT NOT NULL, plan TEXT NOT NULL DEFAULT 'free', role TEXT NOT NULL DEFAULT 'user', created INTEGER NOT NULL);
+    if (ctx.storage.kv.get("schema_v") !== "2") {
+      this.sql.exec(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, handle TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, bio TEXT DEFAULT '', avatar TEXT DEFAULT '', salt TEXT NOT NULL, hash TEXT NOT NULL, plan TEXT NOT NULL DEFAULT 'free', role TEXT NOT NULL DEFAULT 'user', created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', cover TEXT, featured INTEGER DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', publish_at INTEGER, created INTEGER NOT NULL, updated INTEGER NOT NULL, views INTEGER NOT NULL DEFAULT 0, likes INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS posts_user ON posts(user_id); CREATE INDEX IF NOT EXISTS posts_pub ON posts(status, publish_at);
 CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY AUTOINCREMENT, post_id TEXT NOT NULL, name TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created INTEGER NOT NULL);
-CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
+CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);
+CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);`);
+      ctx.storage.kv.put("schema_v", "2");
+    }
   }
   secret() {
-    this.sql.exec("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)");
-    const r = this.one("SELECT v FROM kv WHERE k='sec'"); if (r) return r.v;
+    if (this._sec) return this._sec;
+    const r = this.one("SELECT v FROM kv WHERE k='sec'"); if (r) return (this._sec = r.v);
     const v = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, "0")).join("");
-    this.sql.exec("INSERT INTO kv VALUES('sec', ?)", v); return v;
+    this.sql.exec("INSERT INTO kv VALUES('sec', ?)", v); return (this._sec = v);
   }
   one(q, ...a) { for (const r of this.sql.exec(q, ...a)) return r; return null; }
   all(q, ...a) { return [...this.sql.exec(q, ...a)]; }
@@ -141,14 +146,13 @@ CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
     if (this.limited("sub:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Try again later."] };
     const email = String(b.email || "").trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 120) return { error: [400, "BAD_EMAIL", "Please enter a valid email address."] };
-    this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)");
     const had = this.one("SELECT 1 AS x FROM subscribers WHERE email = ?", email);
     if (!had) this.sql.exec("INSERT INTO subscribers(email, created) VALUES(?,?)", email, Date.now());
     return { ok: true, already: !!had };
   }
   claimLimited(ip) { return this.limited("adm:" + ip, 5, 36e5); }
   setAdmin(uid) { this.sql.exec("UPDATE users SET role='admin' WHERE id = ?", uid); return true; }
-  subs() { this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)"); return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
+  subs() { return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
   addComment(id, b, ip) {
     if (this.limited("cm:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many comments. Try again later."] };
     if (str(b.website, 50)) return { ok: true }; // honeypot
