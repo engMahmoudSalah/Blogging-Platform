@@ -14,7 +14,7 @@ export function Footer() {
             <img 
               src={logo}
               alt="MD Logo" 
-              className="h-8 w-auto"
+              className="h-8 w-auto brightness-0 dark:brightness-100"
               referrerPolicy="no-referrer"
             />
           </Link>
