@@ -46,7 +46,7 @@ export function Header() {
 
       <header className="bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20 gap-4">
+          <div className="flex justify-between items-center h-16 sm:h-20 gap-2 sm:gap-4">
           <Link to="/" className="flex items-center gap-2 group shrink-0">
             <img 
               src={logo}
@@ -102,8 +102,8 @@ export function Header() {
           </nav>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center gap-4">
-            <AuthMenu /><SyncPanel />
+          <div className="md:hidden flex items-center gap-1 sm:gap-3 shrink-0">
+            <span className="hidden sm:flex items-center gap-2"><AuthMenu /><SyncPanel /></span>
             <button
               onClick={toggleTheme}
               className="p-2 text-slate-500 dark:text-slate-400"
@@ -130,6 +130,7 @@ export function Header() {
             className="md:hidden bg-white/90 dark:bg-slate-950/90 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800 overflow-hidden"
           >
             <div className="px-4 pt-2 pb-8 space-y-6">
+              <div className="sm:hidden flex items-center justify-between gap-3"><AuthMenu /><SyncPanel /></div>
               {/* Mobile Search */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

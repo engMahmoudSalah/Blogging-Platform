@@ -28,7 +28,7 @@ export function Home() {
         <div className="hero-glow" />
         
         {/* Blended Bottom Gradient */}
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-background via-background/80 to-transparent z-20" />
+        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-background via-background/80 to-transparent z-0" />
         
         <div className="relative z-10 space-y-8 max-w-5xl px-4 pt-20">
           <motion.div

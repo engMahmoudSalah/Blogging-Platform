@@ -135,6 +135,17 @@ CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id);`);
   view(id) { this.sql.exec(`UPDATE posts SET views = views + 1 WHERE id = ? AND ${this.visible()}`, id, Date.now()); }
   like(id, ip) { if (this.limited("like:" + ip + id, 1, 864e5)) return null; this.sql.exec(`UPDATE posts SET likes = likes + 1 WHERE id = ? AND ${this.visible()}`, id, Date.now()); const r = this.one("SELECT likes FROM posts WHERE id = ?", id); return r ? r.likes : null; }
   comments(id) { return this.all("SELECT id, name, body, created FROM comments WHERE post_id = ? AND status = 'approved' ORDER BY id ASC LIMIT 200", id); }
+  subscribe(b, ip) {
+    if (b.website) return { ok: true };
+    if (this.limited("sub:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Try again later."] };
+    const email = String(b.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 120) return { error: [400, "BAD_EMAIL", "Please enter a valid email address."] };
+    this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)");
+    const had = this.one("SELECT 1 AS x FROM subscribers WHERE email = ?", email);
+    if (!had) this.sql.exec("INSERT INTO subscribers(email, created) VALUES(?,?)", email, Date.now());
+    return { ok: true, already: !!had };
+  }
+  subs() { this.sql.exec("CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created INTEGER NOT NULL)"); return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
   addComment(id, b, ip) {
     if (this.limited("cm:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many comments. Try again later."] };
     if (str(b.website, 50)) return { ok: true }; // honeypot
@@ -194,6 +205,14 @@ async function handle(req, env, url) {
     const r = await h.rss(mt[1]); if (!r) return err(404, "NOT_FOUND", "Blog not found.");
     const base = url.origin, items = r.posts.map((x) => `<item><title>${xml(x.title)}</title><link>${base}/post/${x.id}</link><guid>${base}/post/${x.id}</guid><pubDate>${new Date(x.publish_at || x.created).toUTCString()}</pubDate><description>${xml(x.content.replace(/<[^>]+>/g, " ").slice(0, 300))}</description></item>`).join("");
     return new Response(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${xml(r.user.name)} on Quill</title><link>${base}/@${r.user.handle}</link><description>${xml(r.user.bio || "Posts on Quill")}</description>${items}</channel></rss>`, { headers: { "content-type": "application/rss+xml; charset=utf-8" } });
+  }
+  if (p === "/api/public/subscribe" && m === "POST") { const r = await h.subscribe(await readJson(req), ip); return r.error ? err(...r.error) : json(r, 201); }
+  if (p === "/api/admin/subscribers" && m === "GET") {
+    const k = req.headers.get("x-admin-key") || url.searchParams.get("key") || "";
+    if (!env.ADMIN_KEY || k !== env.ADMIN_KEY) return err(401, "UNAUTHORIZED", "Admin key required.");
+    const rows = await h.subs();
+    if (url.searchParams.get("format") === "csv") return new Response("email,subscribed_at\n" + rows.map((r) => r.email + "," + new Date(r.created).toISOString()).join("\n"), { headers: { "content-type": "text/csv" } });
+    return json({ count: rows.length, subscribers: rows });
   }
   // authenticated
   const uid = await readToken(env, req);
