@@ -36,6 +36,10 @@ export function Dashboard() {
   const loadSubs = async () => { try { const r = await api<{ subscribers: { email: string; created: number }[] }>('/admin/subscribers'); setSubs(r.subscribers); setAMsg(''); } catch (e: any) { setSubs(null); setAMsg(e.message); } };
   const claim = async () => { try { await api('/admin/claim', { method: 'POST', body: { key: adminKey } }); setAdminKey(''); await refresh(); await loadSubs(); } catch (e: any) { setAMsg(e.message); } };
   useEffect(() => { if (tab === 'admin' && user?.role === 'admin') loadSubs(); }, [tab, user]);
+  const [pw, setPw] = useState({ current: '', next: '' });
+  const [pwMsg, setPwMsg] = useState('');
+  const changePw = async () => { setPwMsg(''); try { await api('/account/password', { method: 'POST', body: pw }); setPw({ current: '', next: '' }); setPwMsg('Password changed'); } catch (e: any) { setPwMsg(e?.message || 'Could not change the password'); } };
+  const deleteAccount = async () => { const p = prompt('This deletes your account, posts and their comments for good. Type your password to confirm.'); if (!p) return; try { await api('/account', { method: 'DELETE', body: { password: p } }); window.location.href = '/'; } catch (e: any) { setPwMsg(e?.message || 'Could not delete the account'); } };
   const saveProfile = async () => { await api('/account', { method: 'PATCH', body: profile }); await refresh(); setMsg('Saved'); setTimeout(() => setMsg(''), 2000); };
   const badge = (p: Post) => p.status === 'draft' ? ['Draft', 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'] : p.status === 'scheduled' && (p.publishAt || 0) > Date.now() ? ['Scheduled ' + format(new Date(p.publishAt as number), 'MMM d, HH:mm'), 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'] : ['Published', 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'];
   const card = 'rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5';
@@ -121,6 +125,13 @@ export function Dashboard() {
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Bio<textarea className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white" rows={3} value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} /></label>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Avatar URL (https)<input className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white" value={profile.avatar} onChange={(e) => setProfile({ ...profile, avatar: e.target.value })} /></label>
           <button onClick={saveProfile} className="px-5 py-2 rounded-full bg-orange-600 text-white font-bold">Save profile</button> <span role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{msg}</span>
+          <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <h3 className="font-bold text-slate-900 dark:text-white">Account security</h3>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Current password<input type="password" autoComplete="current-password" className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></label>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">New password (8+ characters)<input type="password" autoComplete="new-password" className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></label>
+            <button onClick={changePw} className="px-5 py-2 rounded-full bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold">Change password</button> <span role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{pwMsg}</span>
+            <div><button onClick={deleteAccount} className="text-sm font-semibold text-red-700 dark:text-red-400 underline">Delete my account</button></div>
+          </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 pt-2">Plans: Free (25 posts) and Pro (500 posts, coming soon). Nothing is charged.</p>
         </div>
       )}

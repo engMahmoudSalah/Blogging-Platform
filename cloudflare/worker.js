@@ -94,6 +94,22 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     return { user: this.pubUser(u) };
   }
   me(id) { const u = this.one("SELECT * FROM users WHERE id = ?", id); if (!u) return null; const c = this.one("SELECT COUNT(*) AS n FROM posts WHERE user_id = ?", id).n; return { ...this.pubUser(u), postCount: c, postLimit: (PLANS[u.plan] || PLANS.free).posts }; }
+  async changePassword(id, b, ip) {
+    if (this.limited("pw:" + ip, 8, 6e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Wait a few minutes."] };
+    const u = this.one("SELECT * FROM users WHERE id = ?", id), cur = typeof b.current === "string" ? b.current : "", next = typeof b.next === "string" ? b.next : "";
+    if (!u || (await pbkdf2(cur, unb64(u.salt))) !== u.hash) return { error: [401, "INVALID_CREDENTIALS", "Current password is wrong."] };
+    if (next.length < 8 || next.length > 200) return { error: [400, "WEAK_PASSWORD", "New password needs at least 8 characters."] };
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    this.sql.exec("UPDATE users SET salt = ?, hash = ? WHERE id = ?", b64(salt), await pbkdf2(next, salt), id); return { ok: true };
+  }
+  async deleteAccount(id, b, ip) {
+    if (this.limited("del:" + ip, 5, 6e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Wait a few minutes."] };
+    const u = this.one("SELECT * FROM users WHERE id = ?", id), pw = typeof b.password === "string" ? b.password : "";
+    if (!u || (await pbkdf2(pw, unb64(u.salt))) !== u.hash) return { error: [401, "INVALID_CREDENTIALS", "Password is wrong."] };
+    if (u.role === "admin") return { error: [403, "FORBIDDEN", "The admin account cannot be deleted here."] };
+    this.sql.exec("DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)", id);
+    this.sql.exec("DELETE FROM posts WHERE user_id = ?", id); this.sql.exec("DELETE FROM users WHERE id = ?", id); return { ok: true };
+  }
   updateProfile(id, b) { this.sql.exec("UPDATE users SET name = ?, bio = ?, avatar = ? WHERE id = ?", str(b.name, 80) || "Writer", str(b.bio, 300), /^https:\/\//.test(str(b.avatar, 500)) ? str(b.avatar, 500) : "", id); return this.me(id); }
   now() { return Date.now(); }
   visible() { return "(status = 'published' OR (status = 'scheduled' AND publish_at <= ?))"; }
@@ -241,6 +257,8 @@ async function handle(req, env, url) {
   }
   if (p === "/api/auth/me") { const u = uid ? await h.me(uid) : null; return u ? json({ user: u }) : err(401, "UNAUTHORIZED", "Not signed in."); }
   if (!uid || !(await h.me(uid))) return err(401, "UNAUTHORIZED", "Please sign in.");
+  if (p === "/api/account/password" && m === "POST") { const r = await h.changePassword(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r); }
+  if (p === "/api/account" && m === "DELETE") { const r = await h.deleteAccount(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r, 200, { "set-cookie": cookie("", 0) }); }
   if (p === "/api/account" && m === "PATCH") return json({ user: await h.updateProfile(uid, await readJson(req)) });
   if (p === "/api/posts" && m === "GET") return json({ posts: await h.mine(uid) });
   if (p === "/api/posts" && m === "POST") { const r = await h.createPost(uid, await readJson(req)); return r.error ? err(...r.error) : json(r, 201); }
