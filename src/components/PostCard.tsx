@@ -16,6 +16,8 @@ export function PostCard({ post, index }: PostCardProps) {
   const clean = text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
   const excerpt = clean.length > 160 ? clean.slice(0, 160).replace(/\s+\S*$/, '') + '...' : clean;
 
+  const hue = [...post.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 17);
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 20 }}
@@ -35,8 +37,8 @@ export function PostCard({ post, index }: PostCardProps) {
             onError={(e) => { const t = e.currentTarget; if (!t.dataset.fb) { t.dataset.fb = '1'; t.src = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="800" height="600" fill="url(#g)"/></svg>'); } }}
           />
         ) : (
-          <div className="w-full aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-            <span className="text-slate-400">No image</span>
+          <div className="w-full aspect-[4/3] flex items-center justify-center text-white/90 text-6xl font-black select-none" style={{ background: `linear-gradient(135deg, hsl(${hue} 85% 55%), hsl(${(hue + 60) % 360} 70% 38%))` }} aria-hidden="true">
+            {(post.title.trim()[0] || 'Q').toUpperCase()}
           </div>
         )}
       </Link>
