@@ -15,6 +15,7 @@ import { Home } from './pages/Home';
 import { CreatePost } from './pages/CreatePost';
 import { EditPost } from './pages/EditPost';
 import { PostDetail } from './pages/PostDetail';
+import { AuthorPage } from './pages/AuthorPage';
 import { AnimatePresence } from 'motion/react';
 
 function NotFound() {
@@ -44,6 +45,8 @@ export default function App() {
                 <Route path="login" element={<Auth mode="login" />} />
                 <Route path="signup" element={<Auth mode="signup" />} />
                 <Route path="dashboard" element={<Dashboard />} />
+                <Route path="author/:handle" element={<AuthorPage notFound={NotFound} />} />
+                <Route path=":at" element={<AuthorPage notFound={NotFound} />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

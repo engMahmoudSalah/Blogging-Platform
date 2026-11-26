@@ -156,7 +156,7 @@ export function PostDetail() {
             <Clock size={14} />
             <span>{post.readingTime} min read</span>
           </div>
-          {post.author.handle && <span>by {post.author.name} (@{post.author.handle})</span>}
+          {post.author.handle && <span>by <Link to={`/author/${post.author.handle}`} className="hover:text-orange-600 underline decoration-dotted">{post.author.name} (@{post.author.handle})</Link></span>}
         </div>
       </header>
 
