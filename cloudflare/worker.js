@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     if (!content.replace(/<[^>]+>/g, "").trim()) return { error: [400, "INVALID", "Content is required."] };
     const tags = Array.isArray(b.tags) ? [...new Set(b.tags.map((t) => str(t, 30).toLowerCase()).filter(Boolean))].slice(0, 8) : [];
     let cover = typeof b.coverImage === "string" ? b.coverImage.trim() : "";
-    if (cover && !/^https:\/\//.test(cover) && !(cover.startsWith("data:image/") && cover.length < 250000)) cover = "";
+    if (cover && !/^https:\/\//.test(cover) && !(/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(cover) && cover.length < 250000)) cover = "";
     let status = ["draft", "published", "scheduled"].includes(b.status) ? b.status : "published", publishAt = null;
     if (status === "scheduled") { publishAt = Number(b.publishAt); if (!publishAt || publishAt <= Date.now()) status = "published", publishAt = null; }
     if (status === "published") publishAt = Date.now();
