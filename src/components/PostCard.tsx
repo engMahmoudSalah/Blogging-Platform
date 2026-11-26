@@ -12,9 +12,9 @@ interface PostCardProps {
 
 export function PostCard({ post, index }: PostCardProps) {
   // Extract a clean excerpt from HTML content
-  const excerpt = post.content
-    .replace(/<[^>]*>?/gm, '') // Remove HTML tags
-    .slice(0, 160) + '...';
+  const text = new DOMParser().parseFromString(post.content.replace(/<\/(p|div|h[1-6]|li|br)>|<br\s*\/?>/gi, ' '), 'text/html').body.textContent || '';
+  const clean = text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  const excerpt = clean.length > 160 ? clean.slice(0, 160).replace(/\s+\S*$/, '') + '...' : clean;
 
   return (
     <motion.article
