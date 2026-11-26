@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
   }
   claimLimited(ip) { return this.limited("adm:" + ip, 5, 36e5); }
   setAdmin(uid) { this.sql.exec("UPDATE users SET role='admin' WHERE id = ?", uid); return true; }
+  delSub(email) { this.sql.exec("DELETE FROM subscribers WHERE email = ?", String(email||"").slice(0,200)); return true; }
   subs() { return this.all("SELECT email, created FROM subscribers ORDER BY id DESC LIMIT 5000"); }
   addComment(id, b, ip) {
     if (this.limited("cm:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many comments. Try again later."] };
@@ -225,11 +226,17 @@ async function handle(req, env, url) {
     if (dig !== ADMIN_HASH) return err(403, "FORBIDDEN", "That key is not valid.");
     await h.setAdmin(uid); return json({ ok: true });
   }
+  if (p === "/api/admin/subscribers" && m === "DELETE") {
+    const u = uid ? await h.me(uid) : null;
+    if (!u || u.role !== "admin") return err(403, "FORBIDDEN", "Admin only.");
+    const em = url.searchParams.get("email"); if (!em) return err(400, "BAD_REQUEST", "email required.");
+    await h.delSub(em); return json({ ok: true });
+  }
   if (p === "/api/admin/subscribers" && m === "GET") {
     const u = uid ? await h.me(uid) : null;
     if (!u || u.role !== "admin") return err(403, "FORBIDDEN", "Admin only.");
     const rows = await h.subs();
-    if (url.searchParams.get("format") === "csv") return new Response("email,subscribed_at\n" + rows.map((r) => r.email + "," + new Date(r.created).toISOString()).join("\n"), { headers: { "content-type": "text/csv" } });
+    if (url.searchParams.get("format") === "csv") return new Response("email,subscribed_at\n" + rows.map((r) => '"' + String(r.email).replace(/"/g, '""') + '",' + new Date(r.created).toISOString()).join("\n"), { headers: { "content-type": "text/csv" } });
     return json({ count: rows.length, subscribers: rows });
   }
   if (p === "/api/auth/me") { const u = uid ? await h.me(uid) : null; return u ? json({ user: u }) : err(401, "UNAUTHORIZED", "Not signed in."); }
