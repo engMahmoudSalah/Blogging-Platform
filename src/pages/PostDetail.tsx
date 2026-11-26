@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { format } from 'date-fns';
-import { ArrowLeft, Clock, Calendar, Tag, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Tag, Edit3, Trash2, Link2, Share2, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -10,6 +10,25 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeHtml } from '../utils/sanitize';
 import { Post } from '../types';
+
+function ShareBar({ title }: { title: string }) {
+  const [done, setDone] = useState(false);
+  const url = typeof location !== 'undefined' ? location.href : '';
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); } catch { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch { /* ignore */ } t.remove(); }
+    setDone(true); setTimeout(() => setDone(false), 2000);
+  };
+  const share = () => { (navigator as Navigator & { share?: (d: { title: string; url: string }) => Promise<void> }).share?.({ title, url }).catch(() => {}); };
+  const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
+  const b = 'inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600 transition-colors';
+  return (
+    <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-900 flex flex-wrap items-center gap-3" data-testid="share-bar">
+      <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Share</span>
+      <button type="button" onClick={copy} className={b} aria-live="polite">{done ? <Check size={16} /> : <Link2 size={16} />}{done ? 'Link copied' : 'Copy link'}</button>
+      {canShare && <button type="button" onClick={share} className={b}><Share2 size={16} />Share</button>}
+    </div>
+  );
+}
 
 function Comments({ id }: { id: string }) {
   const [list, setList] = useState<{ id: number; name: string; body: string; created: number }[]>([]);
@@ -159,6 +178,8 @@ export function PostDetail() {
           prose-img:rounded-3xl prose-img:border prose-img:border-slate-200 dark:prose-img:border-slate-800"
         dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
       />
+
+      <ShareBar title={post.title} />
 
       {(serverMode || fetched) && <Comments id={post.id} />}
 
