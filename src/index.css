@@ -164,3 +164,11 @@
 .ql-editor {
   @apply !min-h-[300px] !font-sans !text-lg;
 }
+
+@media print {
+  header:not(.print-keep), footer, nav, canvas, [data-noprint], #cm-h, section[aria-labelledby="cm-h"], form, .sitedock, [id^="sitedock"] { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  article { padding-top: 0 !important; max-width: 100% !important; }
+  article * { color: #000 !important; }
+  a { text-decoration: underline; }
+}

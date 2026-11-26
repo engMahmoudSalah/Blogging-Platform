@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { format } from 'date-fns';
-import { ArrowLeft, Clock, Calendar, Tag, Edit3, Trash2, Link2, Share2, Check } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Tag, Edit3, Trash2, Link2, Share2, Check, Printer } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -22,9 +22,10 @@ function ShareBar({ title }: { title: string }) {
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   const b = 'inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600 transition-colors';
   return (
-    <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-900 flex flex-wrap items-center gap-3" data-testid="share-bar">
+    <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-900 flex flex-wrap items-center gap-3" data-testid="share-bar" data-noprint="1">
       <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Share</span>
       <button type="button" onClick={copy} className={b} aria-live="polite">{done ? <Check size={16} /> : <Link2 size={16} />}{done ? 'Link copied' : 'Copy link'}</button>
+      <button type="button" onClick={() => window.print()} className={b}><Printer size={16} />Print / PDF</button>
       {canShare && <button type="button" onClick={share} className={b}><Share2 size={16} />Share</button>}
     </div>
   );
@@ -111,7 +112,7 @@ export function PostDetail() {
       exit={{ opacity: 0 }}
       className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8 pt-32"
     >
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between" data-noprint="1">
         <Link to="/" className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 font-medium">
           <ArrowLeft size={18} />
           <span>Back to Blog</span>
@@ -133,7 +134,7 @@ export function PostDetail() {
         </div>}
       </div>
 
-      <header className="space-y-6 mb-10">
+      <header className="space-y-6 mb-10 print-keep">
         <div className="flex flex-wrap gap-3">
           {post.tags.map(tag => (
             <span key={tag} className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest">
