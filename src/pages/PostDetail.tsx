@@ -11,6 +11,16 @@ import { useAuth } from '../context/AuthContext';
 import { sanitizeHtml } from '../utils/sanitize';
 import { Post } from '../types';
 
+function ReadProgress() {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    const on = () => { const h = document.documentElement; const max = h.scrollHeight - h.clientHeight; setP(max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0); };
+    on(); window.addEventListener('scroll', on, { passive: true }); window.addEventListener('resize', on);
+    return () => { window.removeEventListener('scroll', on); window.removeEventListener('resize', on); };
+  }, []);
+  return <div className="fixed top-0 left-0 right-0 h-1 z-[60] pointer-events-none" data-noprint="1" role="progressbar" aria-label="Reading progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p * 100)}><div className="h-full bg-orange-500" style={{ width: `${p * 100}%` }} /></div>;
+}
+
 function ShareBar({ title }: { title: string }) {
   const [done, setDone] = useState(false);
   const url = typeof location !== 'undefined' ? location.href : '';
@@ -106,6 +116,7 @@ export function PostDetail() {
     .slice(0, 2);
 
   return (
+    <><ReadProgress />
     <motion.article
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -206,6 +217,6 @@ export function PostDetail() {
         title="Delete Post"
         message="Are you sure you want to delete this post? This action cannot be undone."
       />
-    </motion.article>
+    </motion.article></>
   );
 }
