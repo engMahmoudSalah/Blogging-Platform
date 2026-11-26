@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     if (b.website) return { ok: true };
     if (this.limited("sub:" + ip, 5, 36e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Try again later."] };
     const email = String(b.email || "").trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 120) return { error: [400, "BAD_EMAIL", "Please enter a valid email address."] };
+    if (!/^[A-Za-z0-9][A-Za-z0-9._%+'-]*@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/.test(email) || email.length > 120) return { error: [400, "BAD_EMAIL", "Please enter a valid email address."] };
     const had = this.one("SELECT 1 AS x FROM subscribers WHERE email = ?", email);
     if (!had) this.sql.exec("INSERT INTO subscribers(email, created) VALUES(?,?)", email, Date.now());
     return { ok: true, already: !!had };
