@@ -113,6 +113,12 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     this.sql.exec("UPDATE users SET del_at = ? WHERE id = ?", at, id); await this.arm();
     return { ok: true, scheduledFor: at };
   }
+  exportAccount(uid, ip) {
+    if (this.limited("exp:" + ip, 5, 6e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Wait a few minutes."] };
+    const u = this.one("SELECT * FROM users WHERE id = ?", uid); if (!u) return { error: [404, "NOT_FOUND", "Account not found."] };
+    const posts = this.all("SELECT * FROM posts WHERE user_id = ? ORDER BY created", uid).map((p) => ({ id: p.id, title: p.title, content: p.content, tags: (() => { try { return JSON.parse(p.tags); } catch { return []; } })(), cover: p.cover || null, status: p.status, featured: !!p.featured, publishAt: p.publish_at || null, created: p.created, updated: p.updated, views: p.views, likes: p.likes, comments: this.all("SELECT name, body, status, created FROM comments WHERE post_id = ? ORDER BY created", p.id) }));
+    return { data: { exportedAt: new Date().toISOString(), account: { handle: u.handle, email: u.email, name: u.name, bio: u.bio, avatar: u.avatar, plan: u.plan, created: u.created }, posts } };
+  }
   restoreAccount(id) { this.sql.exec("UPDATE users SET del_at = NULL WHERE id = ?", id); return { ok: true }; }
   purge() {
     for (const r of this.all("SELECT id FROM users WHERE del_at IS NOT NULL AND del_at <= ? AND role <> 'admin'", Date.now())) {
@@ -272,6 +278,7 @@ async function handle(req, env, url) {
   if (p === "/api/account/password" && m === "POST") { const r = await h.changePassword(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r); }
   if (p === "/api/account/restore" && m === "POST") return json(await h.restoreAccount(uid));
   if (p === "/api/account" && m === "DELETE") { const r = await h.deleteAccount(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r, 200, { "set-cookie": cookie("", 0) }); }
+  if (p === "/api/account/export" && m === "GET") { const r = await h.exportAccount(uid, ip); return r.error ? err(...r.error) : json(r.data, 200, { "content-disposition": 'attachment; filename="quill-export.json"' }); }
   if (p === "/api/account" && m === "PATCH") return json({ user: await h.updateProfile(uid, await readJson(req)) });
   if (p === "/api/posts" && m === "GET") return json({ posts: await h.mine(uid) });
   if (p === "/api/posts" && m === "POST") { const r = await h.createPost(uid, await readJson(req)); return r.error ? err(...r.error) : json(r, 201); }
