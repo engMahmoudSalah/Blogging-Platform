@@ -42,6 +42,7 @@ const readTime = (html) => Math.max(1, Math.ceil(String(html).replace(/<[^>]+>/g
 export class Hub extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env); this.sql = ctx.storage.sql; this.rl = new Map();
+    try { this.sql.exec("SELECT del_at FROM users LIMIT 1"); } catch { try { this.sql.exec("ALTER TABLE users ADD COLUMN del_at INTEGER"); } catch {} }
     if (ctx.storage.kv.get("schema_v") !== "2") {
       this.sql.exec(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, handle TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, bio TEXT DEFAULT '', avatar TEXT DEFAULT '', salt TEXT NOT NULL, hash TEXT NOT NULL, plan TEXT NOT NULL DEFAULT 'free', role TEXT NOT NULL DEFAULT 'user', created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', cover TEXT, featured INTEGER DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', publish_at INTEGER, created INTEGER NOT NULL, updated INTEGER NOT NULL, views INTEGER NOT NULL DEFAULT 0, likes INTEGER NOT NULL DEFAULT 0);
@@ -66,7 +67,7 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     if (w.length >= max) { this.rl.set(key, w); return true; }
     w.push(now); this.rl.set(key, w); if (this.rl.size > 5000) this.rl.clear(); return false;
   }
-  pubUser(u) { return { id: u.id, handle: u.handle, name: u.name, bio: u.bio, avatar: u.avatar, plan: u.plan, role: u.role }; }
+  pubUser(u) { return { id: u.id, handle: u.handle, name: u.name, bio: u.bio, avatar: u.avatar, plan: u.plan, role: u.role, deletionScheduledAt: u.del_at || null }; }
   shape(p, u) {
     const tags = JSON.parse(p.tags || "[]");
     return { id: p.id, title: p.title, content: p.content, tags, readingTime: readTime(p.content), createdAt: p.publish_at && p.status !== "draft" ? p.publish_at : p.created, updatedAt: p.updated,
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
   async login(b, ip) {
     if (this.limited("login:" + ip, 10, 6e5)) return { error: [429, "RATE_LIMITED", "Too many attempts. Wait a few minutes."] };
     const email = str(b.email, 200).toLowerCase(), pw = typeof b.password === "string" ? b.password : "";
+    this.purge();
     const u = this.one("SELECT * FROM users WHERE email = ?", email);
     if (!u || (await pbkdf2(pw, unb64(u.salt))) !== u.hash) return { error: [401, "INVALID_CREDENTIALS", "Invalid email or password."] };
     return { user: this.pubUser(u) };
@@ -107,9 +109,19 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     const u = this.one("SELECT * FROM users WHERE id = ?", id), pw = typeof b.password === "string" ? b.password : "";
     if (!u || (await pbkdf2(pw, unb64(u.salt))) !== u.hash) return { error: [401, "INVALID_CREDENTIALS", "Password is wrong."] };
     if (u.role === "admin") return { error: [403, "FORBIDDEN", "The admin account cannot be deleted here."] };
-    this.sql.exec("DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)", id);
-    this.sql.exec("DELETE FROM posts WHERE user_id = ?", id); this.sql.exec("DELETE FROM users WHERE id = ?", id); return { ok: true };
+    const at = u.del_at || Date.now() + 7 * 864e5;
+    this.sql.exec("UPDATE users SET del_at = ? WHERE id = ?", at, id); await this.arm();
+    return { ok: true, scheduledFor: at };
   }
+  restoreAccount(id) { this.sql.exec("UPDATE users SET del_at = NULL WHERE id = ?", id); return { ok: true }; }
+  purge() {
+    for (const r of this.all("SELECT id FROM users WHERE del_at IS NOT NULL AND del_at <= ? AND role <> 'admin'", Date.now())) {
+      this.sql.exec("DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE user_id = ?)", r.id);
+      this.sql.exec("DELETE FROM posts WHERE user_id = ?", r.id); this.sql.exec("DELETE FROM users WHERE id = ?", r.id);
+    }
+  }
+  async arm() { const n = this.one("SELECT MIN(del_at) m FROM users WHERE del_at IS NOT NULL"); if (n && n.m) await this.ctx.storage.setAlarm(Math.max(n.m, Date.now() + 1000)); }
+  async alarm() { this.purge(); await this.arm(); }
   updateProfile(id, b) { this.sql.exec("UPDATE users SET name = ?, bio = ?, avatar = ? WHERE id = ?", str(b.name, 80) || "Writer", str(b.bio, 300), /^https:\/\//.test(str(b.avatar, 500)) ? str(b.avatar, 500) : "", id); return this.me(id); }
   now() { return Date.now(); }
   visible() { return "(status = 'published' OR (status = 'scheduled' AND publish_at <= ?))"; }
@@ -258,6 +270,7 @@ async function handle(req, env, url) {
   if (p === "/api/auth/me") { const u = uid ? await h.me(uid) : null; return u ? json({ user: u }) : err(401, "UNAUTHORIZED", "Not signed in."); }
   if (!uid || !(await h.me(uid))) return err(401, "UNAUTHORIZED", "Please sign in.");
   if (p === "/api/account/password" && m === "POST") { const r = await h.changePassword(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r); }
+  if (p === "/api/account/restore" && m === "POST") return json(await h.restoreAccount(uid));
   if (p === "/api/account" && m === "DELETE") { const r = await h.deleteAccount(uid, await readJson(req), ip); return r.error ? err(...r.error) : json(r, 200, { "set-cookie": cookie("", 0) }); }
   if (p === "/api/account" && m === "PATCH") return json({ user: await h.updateProfile(uid, await readJson(req)) });
   if (p === "/api/posts" && m === "GET") return json({ posts: await h.mine(uid) });
