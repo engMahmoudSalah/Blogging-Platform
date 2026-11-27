@@ -193,6 +193,8 @@ CREATE TABLE IF NOT EXISTS subscribers(id INTEGER PRIMARY KEY AUTOINCREMENT, ema
     if (str(b.website, 50)) return { ok: true }; // honeypot
     const p = this.one(`SELECT id FROM posts WHERE id = ? AND ${this.visible()}`, id, Date.now()); if (!p) return { error: [404, "NOT_FOUND", "Post not found."] };
     const name = str(b.name, 60), body = str(b.body, 1500); if (!name || body.length < 2) return { error: [400, "INVALID", "Name and comment are required."] };
+    if (this.one("SELECT 1 AS x FROM comments WHERE post_id = ? AND body = ? AND name = ?", id, body, name)) return { ok: true, pending: true };
+    if (this.one("SELECT COUNT(*) AS n FROM comments WHERE post_id = ? AND status = 'pending'", id).n >= 50) return { error: [429, "RATE_LIMITED", "This post has many comments waiting for review. Try again later."] };
     this.sql.exec("INSERT INTO comments(post_id, name, body, created) VALUES(?,?,?,?)", id, name, body, Date.now()); return { ok: true, pending: true };
   }
   inbox(uid) { return this.all("SELECT c.id, c.post_id, c.name, c.body, c.status, c.created, p.title FROM comments c JOIN posts p ON p.id = c.post_id WHERE p.user_id = ? ORDER BY c.id DESC LIMIT 100", uid); }
