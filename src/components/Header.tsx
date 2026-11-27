@@ -66,6 +66,7 @@ export function Header() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search posts, tags, content..."
+              aria-label="Search posts"
               className="w-full pl-11 pr-4 py-2.5 bg-slate-100 dark:bg-slate-900/50 border border-slate-100 dark:border-none rounded-full text-sm focus:ring-2 focus:ring-orange-500/50 transition-all placeholder:text-slate-500"
             />
           </div>
@@ -106,12 +107,15 @@ export function Header() {
             <span className="hidden sm:flex items-center gap-2"><AuthMenu /><SyncPanel /></span>
             <button
               onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               className="p-2 text-slate-500 dark:text-slate-400"
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
               className="p-2 text-slate-600 dark:text-slate-300"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
