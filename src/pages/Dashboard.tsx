@@ -25,8 +25,6 @@ export function Dashboard() {
   }, []);
   useEffect(() => { if (user) { load().catch(() => {}); setProfile({ name: user.name, bio: user.bio, avatar: user.avatar }); } }, [user, load]);
 
-  if (loading) return <div className="pt-40 text-center text-slate-500">Loading...</div>;
-  if (!user) return <Navigate to="/login?next=/dashboard" replace />;
 
   const del = async (id: string) => { if (!confirm('Delete this post and its comments?')) return; await api('/posts/' + id, { method: 'DELETE' }); await load(); reloadFeed(); refresh(); };
   const moderate = async (id: number, action: 'approve' | 'delete') => { await api(`/comments/${id}/${action}`, { method: 'POST' }); load(); };
@@ -45,6 +43,9 @@ export function Dashboard() {
   const badge = (p: Post) => p.status === 'draft' ? ['Draft', 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100'] : p.status === 'scheduled' && (p.publishAt || 0) > Date.now() ? ['Scheduled ' + format(new Date(p.publishAt as number), 'MMM d, HH:mm'), 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'] : ['Published', 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'];
   const card = 'rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5';
   const tabBtn = (t: typeof tab, label: string) => <button onClick={() => setTab(t)} aria-pressed={tab === t} className={`px-4 py-2 rounded-full text-sm font-bold ${tab === t ? 'bg-orange-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}>{label}</button>;
+
+  if (loading) return <div className="pt-40 text-center text-slate-500">Loading...</div>;
+  if (!user) return <Navigate to="/login?next=/dashboard" replace />;
 
   return (
     <div className="max-w-5xl mx-auto px-4 pt-32 pb-20">
